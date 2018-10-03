@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import {StyleSheet} from 'react-native';
+import {StyleSheet,Image,TouchableOpacity,Clipboard,ToastAndroid} from 'react-native';
 import {
     Header,
     Container,
@@ -14,11 +14,96 @@ import {
     Left,
     Right,
     List,
-    ListItem
+    ListItem,
+    Spinner
 } from 'native-base';
 
+import { upload,getTag,cari } from "./Utils";
+
+import { ImagePicker } from "expo";
+
 class Home extends Component{
+    constructor(props){
+        super(props)
+        this.state = {
+            image: null,
+            quotes : [],
+            isLoading : false,
+            log : ""
+        }
+    }
+
+
+    pickImage = async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({quality: 0.4})
+
+        if(result.cancelled){
+            return
+        }
+
+        this.setState({
+            image:result
+        })
+        
+    }
+
+    generate = () => {
+        if(this.state.image === null){
+            return
+        }
+        this.setState({
+            isLoading: true,
+            log: "Upload gambar"
+        })
+        upload(this.state.image, (res) => {
+            this.setState({
+                log:"Analisa gambar"
+            })
+            getTag(res.uploaded[0].id, (tag) => {
+                let word = tag.results[0].tags;
+                this.setState({
+                    log: "Mencari Quote"
+                })
+                cari(word, (data) => {
+                    
+                        this.setState({
+                            quotes: data,
+                            isLoading : false
+                        })
+                })
+            })
+        })
+    }
+
+    copyQuote = (index) => {
+        let qoutelist = this.state.quotes;
+        let selected = qoutelist[index];
+        console.log(selected);
+        let compose = selected.quote+"\n\n -"+selected.author;
+        Clipboard.setString(compose);
+        alert("Copied");
+    }
+
     render(){
+        let quotes = this.state.quotes;
+        let list = [];
+        quotes.forEach((quote,key) => {
+            list.push(
+                <ListItem key={key}>
+                    <Left>
+                        <Body>
+                            <Text>{"\"" + quote.quote + "\"\n\n"}</Text>
+                            <Text style={{ fontStyle: "italic" }} >{"-" + quote.author}</Text>
+                        </Body>
+                    </Left>
+                    <Right>
+                        <Button transparent>
+                            <Icon name="content-copy" type="MaterialCommunityIcons" style={{ color: '#8642f4' }} onPress={() => this.copyQuote(key)} />
+                        </Button>
+                    </Right>
+                </ListItem>
+            )
+        });
         return(
             <Container>
                 <Header>
@@ -27,65 +112,39 @@ class Home extends Component{
                     </Body>
                 </Header>
                 <Card>
-                    <CardItem>
-                        <Body style={styles.wrapUpload}>
-                            <Icon name="camera" style={styles.iconUpload} onPress={() => alert("You have uploaded the image")}/>
-                            <Text>Upload Your Image Here!</Text>
-                        </Body>
+                    <CardItem >
+                        {
+                            this.state.image ?
+                                <TouchableOpacity onPress={this.pickImage}>
+
+                                    <Image style={{ width: 300, height: 300, resizeMode: 'contain' }} source={{uri :this.state.image.uri}} />
+                                </TouchableOpacity>
+                            :
+                                <Body style={styles.wrapUpload}>
+                                    <Icon onPress={this.pickImage} name="camera" style={styles.iconUpload} />
+                                    <Text>Upload Your Image Here!</Text>
+                                </Body>
+                        }
                     </CardItem>
                     <CardItem>
                         <Body>
-                        <Button full style={{backgroundColor:'#8642f4'}}>
-                            <Icon name='loop' type="MaterialIcons"/>
-                            <Text>Create Caption</Text>
-                        </Button>
+                            {
+                                this.state.isLoading ? 
+                                [<Spinner key={0} />,
+                                <Text key={1}>{this.state.log}</Text>]
+                                :
+                                    <Button onPress={this.generate} full style={{ backgroundColor: '#8642f4' }}>
+                                        <Icon name='loop' type="MaterialIcons" />
+                                        <Text>Create Caption</Text>
+                                    </Button>
+                            }
                         </Body>
                     </CardItem>
                 </Card>
                 <Content>
                     <Card>
                         <List>
-                            <ListItem>
-                                <Left>
-                                    <Text>Masalah hidup seperti ombak tepi pantai, ia akan datang tapi pada saatnya ia akan pergi.</Text>
-                                </Left>
-                                <Right>
-                                    <Button transparent>
-                                        <Icon name="content-copy" type="MaterialCommunityIcons" style={{color:'#8642f4'}} onPress={() => alert("Copied")}/>
-                                    </Button>
-                                </Right>
-                            </ListItem>
-                            <ListItem>
-                                <Left>
-                                    <Text>Anda tidak dapat menyeberangi lautan sampai Anda mempunyai keberanian untuk melupakan pantai.</Text>
-                                </Left>
-                                <Right>
-                                    <Button transparent>
-                                        <Icon name="content-copy" type="MaterialCommunityIcons" style={{color:'#8642f4'}} onPress={() => alert("Copied")}/>
-                                    </Button>
-                                </Right>
-                            </ListItem>
-                            <ListItem>
-                                <Left>
-                                    <Text>Engkau tak akan bisa menyeberangi samudera kecuali engkau punya keberanian kehilangan kontak pandang dengan garis pantai.</Text>
-                                </Left>
-                                <Right>
-                                    <Button transparent>
-                                        <Icon name="content-copy" type="MaterialCommunityIcons" style={{color:'#8642f4'}} onPress={() => alert("Copied")}/>
-                                    </Button>
-                                </Right>
-                            </ListItem>
-                            <ListItem>
-                                <Left>
-                                <Text>Orang yang menempuh jarak terjauh umumnya orang yang bersedia untuk
-                                    melakukannya dan yang berani. Hal yang pasti adalah bahwa perahu tidak akan pernah berada jauh dari pantai.</Text>
-                                </Left>
-                                <Right>
-                                    <Button transparent>
-                                        <Icon name="content-copy" type="MaterialCommunityIcons" style={{ color: '#8642f4'}} onPress={() => alert("Copied")} />
-                                    </Button>
-                                </Right>
-                            </ListItem>
+                           {list}
                         </List>
                     </Card>
                 </Content>
@@ -98,7 +157,7 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        height: 300,
+        height: 200,
         backgroundColor: '#f4f4f4'
     },
     iconUpload: {
